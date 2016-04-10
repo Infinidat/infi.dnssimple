@@ -9,7 +9,11 @@ import json
 import socket
 import docopt
 import requests
-import infi.traceback
+
+
+def silence_requests_warning():
+    import requests.packages.urllib3
+    requests.packages.urllib3.disable_warnings()
 
 
 def get_hostname():
@@ -24,9 +28,10 @@ def update_dns(domain, token, name, ipv4_adress):
     base_url = "https://api.dnsimple.com/v1/domains/{0}/records".format(domain)
     headers = {"X-DNSimple-Domain-Token": token, "Accept": "application/json",  "Content-Type": "application/json"}
 
+    response = requests.get(base_url, headers=headers)
+    response.raise_for_status()
     records = {item['record']['name']: item['record'] for
-               item in requests.get(base_url, headers=headers).json() if
-               'record' in item and 'name' in item['record']}
+               item in response.json() if 'record' in item and 'name' in item['record']}
 
     if name in records:
         update_url = "{0}/{1}".format(base_url, records[name]['id'])
@@ -40,10 +45,13 @@ def update_dns(domain, token, name, ipv4_adress):
     return result.json()
 
 
-@infi.traceback.pretty_traceback_and_exit_decorator
 def main(argv=sys.argv[1:]):
     from infi.dnssimple.__version__ import __version__
+    from infi.traceback import pretty_traceback_and_exit_decorator
     arguments = docopt.docopt(__doc__.format(__version__), version=__version__, argv=argv)
-    print update_dns(arguments['<domain>'], arguments['<token>'],
-                     arguments.get('<hostname>') or get_hostname(),
-                     arguments.get('<address>') or get_external_ipv4_address())
+    silence_requests_warning()
+    if arguments['update']:
+        name = arguments.get('<hostname>') or get_hostname()
+        address = arguments.get('<address>') or get_external_ipv4_address()
+        func = pretty_traceback_and_exit_decorator(update_dns)
+        print func(arguments['<domain>'], arguments['<token>'], name, address)
