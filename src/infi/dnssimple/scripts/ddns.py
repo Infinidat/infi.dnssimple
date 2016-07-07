@@ -2,6 +2,7 @@
 Usage:
    ddns update <domain> <token> [<hostname> [<address>]]
    ddns add <domain> <token> <name> <type> <content>
+   ddns delete <domain> <token> <name> <type> <content>
 
 """
 
@@ -46,6 +47,23 @@ def update_dns(domain, token, name, content, record_type="A"):
     return result.json()
 
 
+def delete_dns(domain, token, name, content, record_type="A"):
+    base_url = "https://api.dnsimple.com/v1/domains/{0}/records".format(domain)
+    headers = {"X-DNSimple-Domain-Token": token, "Accept": "application/json",  "Content-Type": "application/json"}
+
+    response = requests.get(base_url, headers=headers)
+    response.raise_for_status()
+    [record] = [item['record'] for item in response.json() if
+                'record' in item and item['record']['name'] == name and
+                item['record']['content'] == content and item['record']['record_type'] == record_type]
+
+    delete_url = "{0}/{1}".format(base_url, record['id'])
+    result = requests.delete(delete_url, headers=headers)
+
+    result.raise_for_status()
+    return result.json()
+
+
 def main(argv=sys.argv[1:]):
     from infi.dnssimple.__version__ import __version__
     from infi.traceback import pretty_traceback_and_exit_decorator
@@ -58,5 +76,9 @@ def main(argv=sys.argv[1:]):
         print func(arguments['<domain>'], arguments['<token>'], name, address)
     elif arguments['add']:
         func = pretty_traceback_and_exit_decorator(update_dns)
+        args = arguments['<domain>'], arguments['<token>'], arguments['<name>'], arguments['<content>'], arguments['<type>']
+        print func(*args)
+    elif arguments['delete']:
+        func = pretty_traceback_and_exit_decorator(delete_dns)
         args = arguments['<domain>'], arguments['<token>'], arguments['<name>'], arguments['<content>'], arguments['<type>']
         print func(*args)
