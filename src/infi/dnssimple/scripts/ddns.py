@@ -58,5 +58,5 @@ def main(argv=sys.argv[1:]):
         print func(arguments['<domain>'], arguments['<token>'], name, address)
     elif arguments['add']:
         func = pretty_traceback_and_exit_decorator(update_dns)
-        args = arguments['<domain>'], arguments['<token>'], arguments['<name>'], arguments['<type>'], arguments['<content>']
+        args = arguments['<domain>'], arguments['<token>'], arguments['<name>'], arguments['<content>'], arguments['<type>']
         print func(*args)
