@@ -26,7 +26,7 @@ def get_external_ipv4_address():
     return requests.get("http://icanhazip.com/").text.strip()
 
 
-def update_dns(domain, token, name, content, record_type="A"):
+def update_dns(domain, token, name, content, record_type="A", ttl=60, prio=10):
     base_url = "https://api.dnsimple.com/v1/domains/{0}/records".format(domain)
     headers = {"X-DNSimple-Domain-Token": token, "Accept": "application/json",  "Content-Type": "application/json"}
 
@@ -40,7 +40,7 @@ def update_dns(domain, token, name, content, record_type="A"):
         data = {"record": {"content": content, "name": name}}
         result = requests.put(update_url, headers=headers, data=json.dumps(data))
     else:
-        data = {"record": {"content": content, "name": name, "record_type": record_type, "ttl": 60, "prio": 10}}
+        data = {"record": {"content": content, "name": name, "record_type": record_type, "ttl": ttl, "prio": prio}}
         result = requests.post(base_url, headers=headers, data=json.dumps(data))
 
     result.raise_for_status()
