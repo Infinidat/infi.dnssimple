@@ -2,7 +2,8 @@
 Usage:
    ddns update <domain> <token> [<hostname> [<address>]]
    ddns add <domain> <token> <name> <type> <content>
-
+   ddns delete <domain> <token> <name> <type> <content>
+   ddns dump <domain> <token>
 """
 
 import sys
@@ -25,25 +26,61 @@ def get_external_ipv4_address():
     return requests.get("http://icanhazip.com/").text.strip()
 
 
-def update_dns(domain, token, name, content, record_type="A"):
-    base_url = "https://api.dnsimple.com/v1/domains/{0}/records".format(domain)
-    headers = {"X-DNSimple-Domain-Token": token, "Accept": "application/json",  "Content-Type": "application/json"}
+def get_account_id(token):
+    base_url = "https://api.dnsimple.com/v2/accounts"
+    headers = {"Authorization": "Bearer {0}".format(token), "Accept": "application/json",  "Content-Type": "application/json"}
 
     response = requests.get(base_url, headers=headers)
     response.raise_for_status()
-    records = {item['record']['name']: item['record'] for
-               item in response.json() if 'record' in item and 'name' in item['record']}
+    return response.json()['data'][0]['id']
+
+
+def update_dns(domain, token, name, content, record_type="A", ttl=60):
+    base_url = "https://api.dnsimple.com/v2/{0}/zones/{1}/records".format(get_account_id(token), domain)
+    headers = {"Authorization": "Bearer {0}".format(token), "Accept": "application/json",  "Content-Type": "application/json"}
+
+    response = requests.get('{0}?per_page=100'.format(base_url), headers=headers)
+    response.raise_for_status()
+    records = {item['name']: item for
+               item in response.json()['data'] if 'name' in item}
 
     if name and name in records:
         update_url = "{0}/{1}".format(base_url, records[name]['id'])
-        data = {"record": {"content": content, "name": name}}
-        result = requests.put(update_url, headers=headers, data=json.dumps(data))
+        data = {"content": content, "name": name}
+        result = requests.patch(update_url, headers=headers, data=json.dumps(data))
     else:
-        data = {"record": {"content": content, "name": name, "record_type": record_type, "ttl": 60, "prio": 10}}
+        data = {"content": content, "name": name, "type": record_type, "ttl": ttl}
         result = requests.post(base_url, headers=headers, data=json.dumps(data))
 
     result.raise_for_status()
     return result.json()
+
+
+def delete_dns(domain, token, name, content, record_type="A"):
+    base_url = "https://api.dnsimple.com/v2/{0}/zones/{1}/records".format(get_account_id(token), domain)
+    headers = {"Authorization": "Bearer {0}".format(token), "Accept": "application/json",  "Content-Type": "application/json"}
+
+    response = requests.get('{0}?per_page=100'.format(base_url), headers=headers)
+    response.raise_for_status()
+    [record] = [item for item in response.json()['data'] if
+                'name' in item and item['name'] == name and
+                item['content'] == content and item['type'] == record_type]
+
+    delete_url = "{0}/{1}".format(base_url, record['id'])
+    result = requests.delete(delete_url, headers=headers)
+
+    result.raise_for_status()
+    return result.json()
+
+
+def dump_dns(domain, token):
+    from json import dumps
+    base_url = "https://api.dnsimple.com/v2/{0}/zones/{1}/records".format(get_account_id(token), domain)
+    headers = {"Authorization": "Bearer {0}".format(token), "Accept": "application/json",  "Content-Type": "application/json"}
+
+    response = requests.get('{0}?per_page=100'.format(base_url), headers=headers)
+    response.raise_for_status()
+    return dumps(response.json()['data'], indent=4)
 
 
 def main(argv=sys.argv[1:]):
@@ -59,4 +96,12 @@ def main(argv=sys.argv[1:]):
     elif arguments['add']:
         func = pretty_traceback_and_exit_decorator(update_dns)
         args = arguments['<domain>'], arguments['<token>'], arguments['<name>'], arguments['<content>'], arguments['<type>']
+        print func(*args)
+    elif arguments['delete']:
+        func = pretty_traceback_and_exit_decorator(delete_dns)
+        args = arguments['<domain>'], arguments['<token>'], arguments['<name>'], arguments['<content>'], arguments['<type>']
+        print func(*args)
+    elif arguments['dump']:
+        func = pretty_traceback_and_exit_decorator(dump_dns)
+        args = arguments['<domain>'], arguments['<token>']
         print func(*args)
