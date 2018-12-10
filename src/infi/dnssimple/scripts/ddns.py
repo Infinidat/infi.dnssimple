@@ -62,15 +62,17 @@ def delete_dns(domain, token, name, content, record_type="A"):
 
     response = requests.get('{0}?per_page=100'.format(base_url), headers=headers)
     response.raise_for_status()
-    [record] = [item for item in response.json()['data'] if
-                'name' in item and item['name'] == name and
-                item['content'] == content and item['type'] == record_type]
+    try:
+        [record] = [item for item in response.json()['data'] if
+                    'name' in item and item['name'] == name and
+                    item['content'] == content and item['type'] == record_type]
 
-    delete_url = "{0}/{1}".format(base_url, record['id'])
-    result = requests.delete(delete_url, headers=headers)
-
-    result.raise_for_status()
-    return result.json()
+        delete_url = "{0}/{1}".format(base_url, record['id'])
+        result = requests.delete(delete_url, headers=headers)
+        result.raise_for_status()
+        return 'DNS record deleted'
+    except ValueError:
+        return 'DNS record not found'
 
 
 def dump_dns(domain, token):
@@ -92,16 +94,16 @@ def main(argv=sys.argv[1:]):
         name = arguments.get('<hostname>') or get_hostname()
         address = arguments.get('<address>') or get_external_ipv4_address()
         func = pretty_traceback_and_exit_decorator(update_dns)
-        print func(arguments['<domain>'], arguments['<token>'], name, address)
+        print(func(arguments['<domain>'], arguments['<token>'], name, address))
     elif arguments['add']:
         func = pretty_traceback_and_exit_decorator(update_dns)
         args = arguments['<domain>'], arguments['<token>'], arguments['<name>'], arguments['<content>'], arguments['<type>']
-        print func(*args)
+        print(func(*args))
     elif arguments['delete']:
         func = pretty_traceback_and_exit_decorator(delete_dns)
         args = arguments['<domain>'], arguments['<token>'], arguments['<name>'], arguments['<content>'], arguments['<type>']
-        print func(*args)
+        print(func(*args))
     elif arguments['dump']:
         func = pretty_traceback_and_exit_decorator(dump_dns)
         args = arguments['<domain>'], arguments['<token>']
-        print func(*args)
+        print(func(*args))
